@@ -37,6 +37,9 @@ def step(r, v, m, a, dt=None):
     return r_new, v_new, m_new
 
 
+euler_step = step      # name used by run.py
+
+
 # ---------------------------------------------------------------- self-test:  python dynamics.py
 if __name__ == "__main__":
     from params import CASES, GM, m0

@@ -69,6 +69,14 @@ PAPER = {
 PAPER_30N = dict(Tmax=30.0, ke=0.00225, tf=683.6, dm_smcio=2.22, dm_zem=3.29)   # Table 4, LS1
 
 
+# ---------------------------------------------------------------- aliases used by smcio/run/zemzev/plots
+H, M0, TMAX, K_E, EPS_E = h, m0, Tmax, ke, eps
+B, CC = b_env, c_env
+LAND_TOL, T_SIM_MAX = R_stop, t_max
+for _cs in CASES.values():          # zemzev.py reads twp / rwp / vwp
+    _cs["twp"], _cs["rwp"], _cs["vwp"] = _cs["t_wp"], _cs["r_wp"], _cs["v_wp"]
+
+
 # ---------------------------------------------------------------- self-test:  python params.py
 if __name__ == "__main__":
     print(f"GM    = {GM:.2f} m^3/s^2   (expect ~104.8)")
