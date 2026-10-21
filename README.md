@@ -102,7 +102,7 @@ LS1 zemzev tf=624.20 s  dm=3.46 kg  pos err=0.000 m  |vf|=0.0014 m/s  int|a|^2dt
 - [x] **Report 1** (12 Oct): understanding the paper
 - [x] **Report 2** (22 Oct): simulating the paper's results
 - [ ] **Final report** (31 Oct): extensions and their validation
-- [ ] **Presentation** (6 Nov)
+- [ ] **Presentation** (31 Oct)
 
 ## Planned extensions
 
