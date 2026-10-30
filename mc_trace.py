@@ -9,7 +9,7 @@ import params as P
 import smcio
 from dynamics import g_total, clip_thrust
 from gravity import grad_U
-import montecarlo as MC
+import Montecarlo as MC
 
 exp, seed, law, use_filter = sys.argv[1], int(sys.argv[2]), sys.argv[3], bool(int(sys.argv[4]))
 on = MC.EXPERIMENTS[exp]

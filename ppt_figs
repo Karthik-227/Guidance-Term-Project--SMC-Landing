@@ -18,7 +18,7 @@ import params as P
 from gravity import grad_U
 from pole import grad_exact
 from dynamics import g_total
-import montecarlo as MC
+import Montecarlo as MC
 
 OUT = "figs_slides/"
 os.makedirs(OUT, exist_ok=True)
