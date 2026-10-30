@@ -1,0 +1,290 @@
+"""
+slide_figs.py - figures for the presentation (slides 10 onward), drawn in MATLAB's default style.
+
+Everything is computed from our own code and saved results:
+    results/LS1_smcio.npz                      (python3 run.py LS1)
+    results/mc_E1..E5_smcio.npz, *_kf.npz, mc_E5_zemzev.npz   (python3 montecarlo.py ...)
+    results/trace_E5_1000_smcio.npz, *_kf.npz  (python3 mc_trace.py E5 1000 smcio 0 / 1)
+
+Usage:  python3 slide_figs.py          -> figs_slides/*.png
+"""
+import os
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+import params as P
+from gravity import grad_U
+from pole import grad_exact
+from dynamics import g_total
+import montecarlo as MC
+
+OUT = "figs_slides/"
+os.makedirs(OUT, exist_ok=True)
+
+# ---------------------------------------------------------------- MATLAB look
+MB = (0.0, 0.447, 0.741)       # MATLAB default colour order
+MO = (0.850, 0.325, 0.098)
+MY = (0.929, 0.694, 0.125)
+MP = (0.494, 0.184, 0.556)
+MG = (0.466, 0.674, 0.188)
+plt.rcParams.update({
+    "font.family": "Liberation Sans", "font.size": 15,
+    "axes.linewidth": 0.6, "axes.edgecolor": "0.15", "axes.grid": True,
+    "grid.color": "0.85", "grid.linewidth": 0.5, "grid.linestyle": "-",
+    "axes.spines.top": True, "axes.spines.right": True,
+    "xtick.direction": "in", "ytick.direction": "in", "xtick.top": True, "ytick.right": True,
+    "xtick.major.size": 3.5, "ytick.major.size": 3.5,
+    "axes.titlesize": 16, "axes.titleweight": "bold",
+    "legend.frameon": True, "legend.edgecolor": "0.15", "legend.fancybox": False, "legend.framealpha": 1,
+    "lines.linewidth": 1.2, "figure.facecolor": "white", "savefig.dpi": 200,
+})
+
+
+def mboxplot(ax, data, labels):
+    """MATLAB-style boxplot: blue box, red median, dashed black whiskers, red + outliers."""
+    b = ax.boxplot(data, widths=0.5, patch_artist=False,
+                   boxprops=dict(color=MB, linewidth=1), medianprops=dict(color="r", linewidth=1),
+                   whiskerprops=dict(color="k", linestyle="--", linewidth=0.8),
+                   capprops=dict(color="k", linewidth=0.8),
+                   flierprops=dict(marker="+", markeredgecolor="r", markersize=6))
+    ax.set_xticks(range(1, len(labels) + 1))
+    ax.set_xticklabels(labels)
+    return b
+
+
+# ================================================================ slide 10: old vs new gravity
+def fig_gravity():
+    fig, ax = plt.subplots(1, 2, figsize=(13, 5.0), gridspec_kw=dict(width_ratios=[1.25, 1]))
+    a = ax[0]
+    th = np.linspace(0, 2 * np.pi, 400)
+    a.fill(P.la * np.cos(th), P.lc * np.sin(th), color="0.88", edgecolor="0.3", linewidth=0.8)
+    a.plot(P.la * np.cos(th), P.la * np.sin(th), "--", color="0.35", linewidth=0.9)
+    a.text(-120, 600, "dashed circle: r = 1000 m\n(series valid only outside it)", fontsize=13, color="0.25")
+    L = 170.0
+    for name, cs in P.CASES.items():
+        r = cs["rfd"]
+        for g, col in ((grad_U(r), MO), (grad_exact(r), MB)):
+            u = g / np.linalg.norm(g)
+            a.annotate("", xy=(r[0] + L * u[0], r[2] + L * u[2]), xytext=(r[0], r[2]),
+                       arrowprops=dict(arrowstyle="-|>", color=col, lw=1.6, mutation_scale=12))
+        a.plot(r[0], r[2], "ko", ms=4)
+        off = (18, 22) if name != "LS7" else (25, -45)
+        a.text(r[0] + off[0], r[2] + off[1], name, fontsize=13)
+    a.plot([], [], color=MO, lw=1.6, label="paper: 2nd-order series")
+    a.plot([], [], color=MB, lw=1.6, label="ours: exact ellipsoid")
+    a.set_xlim(-150, 1300); a.set_ylim(-320, 1100); a.set_aspect("equal")
+    a.set_xlabel("x (m)"); a.set_ylabel("z (m)")
+    a.set_title("Direction of gravity at each landing site")
+    a.legend(loc="upper right", fontsize=13)
+
+    b = ax[1]
+    names = list(P.CASES)
+    old = np.array([grad_U(P.CASES[n]["rfd"]) @ P.CASES[n]["rfd"] / np.linalg.norm(P.CASES[n]["rfd"]) for n in names])
+    new = np.array([grad_exact(P.CASES[n]["rfd"]) @ P.CASES[n]["rfd"] / np.linalg.norm(P.CASES[n]["rfd"]) for n in names])
+    x = np.arange(len(names))
+    s = 1e4
+    b.bar(x - 0.2, np.clip(old * s, -25, 12), 0.4, color=MO, label="paper: 2nd-order series")
+    b.bar(x + 0.2, new * s, 0.4, color=MB, label="ours: exact ellipsoid")
+    b.axhline(0, color="k", linewidth=0.8)
+    b.annotate(f"+{old[-1]*s:.0f} (off scale)\npoints OUTWARD", xy=(6 - 0.2, 12), xytext=(3.2, 9.5),
+               fontsize=13, arrowprops=dict(arrowstyle="->", color="k", lw=0.8))
+    b.set_xticks(x); b.set_xticklabels(names)
+    b.set_ylim(-25, 14)
+    b.set_ylabel("radial gravity  (×10$^{-4}$ m/s$^2$),  < 0 = inward")
+    b.set_title("Radial gravity at the landing sites")
+    b.legend(loc="lower left", fontsize=13)
+    fig.tight_layout()
+    fig.savefig(OUT + "s10_gravity_models.png")
+    plt.close(fig)
+    print("radial g old:", np.round(old, 6), "\nradial g new:", np.round(new, 6))
+
+
+# ================================================================ slide 13: which error breaks SMC-IO (LS1)
+def fig_mc_sensitivity():
+    exps = ["E1", "E2", "E3", "E4", "E5"]
+    labs = ["E1\nnoise", "E2\ngravity", "E3\nthrust", "E4\nstart", "E5\nall"]
+    d = [np.load(f"results/mc_{e}_smcio.npz") for e in exps]
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4.6))
+    mboxplot(ax[0], [x["err"] for x in d], labs)
+    ax[0].axhline(3.0, color="k", linestyle=":", linewidth=1)
+    ax[0].text(2.6, 3.25, "3 m requirement", fontsize=13)
+    ax[0].set_ylabel("final distance to site (m)")
+    ax[0].set_title("SMC-IO as published: where it ends up")
+    mboxplot(ax[1], [x["dm"] for x in d], labs)
+    ax[1].axhline(2.18, color="k", linestyle=":", linewidth=1)
+    ax[1].text(2.6, 2.4, "no-error run: 2.18 kg", fontsize=13)
+    ax[1].set_ylabel("fuel used (kg)")
+    ax[1].set_title("Fuel used")
+    fig.suptitle("LS1 only, 100 runs per experiment", fontsize=14)
+    fig.tight_layout()
+    fig.savefig(OUT + "s13_mc_sensitivity.png")
+    plt.close(fig)
+
+
+# ================================================================ slide 14: the velocity box from noisy vs true state
+def fig_box():
+    A = np.load("results/trace_E5_1000_smcio.npz")
+    B = np.load("results/trace_E5_1000_smcio_kf.npz")
+    fig, ax = plt.subplots(1, 2, figsize=(13, 4.0), sharey=True)
+    for k, (D, name) in enumerate(((A, "No filter"), (B, "With Kalman filter"))):
+        w = (D["t"] >= 200) & (D["t"] <= 220)
+        t = D["t"][w]
+        ax[k].plot(t, D["lo_true"][w, 0], "k-", linewidth=1.4, label="lower bound, true state")
+        ax[k].plot(t, D["lo_seen"][w, 0], "-o", color=MO, markersize=3, linewidth=1,
+                   label="lower bound, measured state")
+        ax[k].plot(t, D["a_cmd"][w, 0], "-", color=MB, linewidth=1.4, label="commanded a$_x$")
+        ax[k].set_title(name)
+        ax[k].set_xlabel("time (s)")
+    ax[0].set_ylabel("a$_x$ (m/s$^2$)")
+    ax[0].set_ylim(-1.0, 0.75)
+    h, l = ax[0].get_legend_handles_labels()
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
+    fig.legend(h, l, loc="lower center", ncol=3, fontsize=13)
+    fig.savefig(OUT + "s14_box.png")
+    plt.close(fig)
+
+
+# ================================================================ slides 15-16: Kalman filter on our data
+def run_filter_on_ls1(seed=7):
+    """Take the nominal LS1 trajectory, add our sensor noise, and filter it.
+    Also run a fixed-alpha low-pass filter on the same measurements for comparison."""
+    d = np.load("results/LS1_smcio.npz")
+    r, v, a = d["r"], d["v"], d["a"]
+    rng = np.random.default_rng(seed)
+    z_r = r + rng.normal(0, MC.SIG_R, r.shape)
+    z_v = v + rng.normal(0, MC.SIG_V, v.shape)
+    kf = MC.NavFilter(z_r[0], z_v[0])
+    est_v = np.zeros_like(v)
+    est_v[0] = kf.update(z_r[0], z_v[0])[1]
+    alpha = 0.9
+    lpf_v = np.zeros_like(v)
+    lpf_v[0] = z_v[0]
+    for k in range(1, len(v)):
+        kf.predict(a[k - 1])
+        est_v[k] = kf.update(z_r[k], z_v[k])[1]
+        lpf_v[k] = alpha * lpf_v[k - 1] + (1 - alpha) * z_v[k]
+    return d["t"], v, z_v, est_v, lpf_v
+
+
+def kalman_gains(n=12500):
+    """Gain history of our filter (it does not depend on the data for a linear model)."""
+    h = P.H
+    A = np.array([[1, h], [0, 1]])
+    H = np.eye(2)
+    Q = 1e-3 ** 2 * np.array([[h**4 / 4, h**3 / 2], [h**3 / 2, h**2]])
+    R = np.diag([MC.SIG_R**2, MC.SIG_V**2])
+    Pk = R.copy()
+    K = np.zeros((n, 2, 2))
+    for k in range(n):
+        if k > 0:
+            Pk = A @ Pk @ A.T + Q                                 # P_k^- = A P_{k-1} A^T + Q
+        K[k] = Pk @ H.T @ np.linalg.inv(H @ Pk @ H.T + R)        # K_k = P_k^- H^T (H P_k^- H^T + R)^-1
+        Pk = Pk - K[k] @ H @ Pk                                   # P_k = P_k^- - K_k H P_k^-
+    return np.arange(n) * h, K
+
+
+def fig_kf():
+    t, v, z, est, lpf = run_filter_on_ls1()
+    w = (t >= 100) & (t <= 110)
+    fig, ax = plt.subplots(figsize=(10, 3.7))
+    ax.plot(t[w], z[w, 0], ".", color="0.6", markersize=4, label="measured (sensor noise σ = 1 cm/s)")
+    ax.plot(t[w], lpf[w, 0], "-", color=MY, linewidth=1.4, label="low-pass filter, fixed α = 0.9")
+    ax.plot(t[w], est[w, 0], "-", color=MB, linewidth=2.0, label="Kalman filter estimate")
+    ax.plot(t[w], v[w, 0], "k--", linewidth=1.2, label="true velocity")
+    ax.set_xlabel("time (s)"); ax.set_ylabel("v$_x$ (m/s)")
+    ax.set_title("LS1: x-velocity seen by the guidance")
+    ax.legend(loc="upper left", fontsize=12, ncol=2)
+    fig.tight_layout()
+    fig.savefig(OUT + "s15_kf_filtering.png")
+    plt.close(fig)
+    full = t > 5
+    print("vx error std: raw %.4f  lpf %.4f  kf %.5f" % (np.std(z[full, 0] - v[full, 0]),
+          np.std(lpf[full, 0] - v[full, 0]), np.std(est[full, 0] - v[full, 0])))
+
+    tg, K = kalman_gains()
+    fig, ax = plt.subplots(figsize=(12, 4.3))
+    ax.semilogy(tg + P.H, K[:, 0, 0], "-", color=MB, linewidth=1.6, label="position gain  K$_r$")
+    ax.semilogy(tg + P.H, K[:, 1, 1], "-", color=MO, linewidth=1.6, label="velocity gain  K$_v$")
+    for tt in (0.0, 1.0, 10.0, 100.0):
+        k = int(round(tt / P.H))
+        ax.plot(tt + P.H, K[k, 0, 0], "s", color=MB, markersize=5)
+        ax.plot(tt + P.H, K[k, 1, 1], "s", color=MO, markersize=5)
+    ax.set_xscale("log")
+    ax.set_xlabel("time since the filter started (s)")
+    ax.set_ylabel("Kalman gain K$_k$  (α$_k$ = 1 − K$_k$)")
+    ax.set_title("How much each new measurement is trusted")
+    ax.legend(loc="lower left", fontsize=13)
+    fig.tight_layout()
+    fig.savefig(OUT + "s16_kf_gain.png")
+    plt.close(fig)
+    for tt in (0.0, 1.0, 10.0, 100.0, 600.0):
+        k = int(round(tt / P.H))
+        print(f"t={tt:6.1f}s  K_r={K[k,0,0]:.4f} alpha_r={1-K[k,0,0]:.4f}   K_v={K[k,1,1]:.4f} alpha_v={1-K[k,1,1]:.4f}")
+
+
+# ================================================================ slide 16: the algorithm (Shane Ross / Phil Kim notation)
+def fig_kf_loop():
+    fig, ax = plt.subplots(figsize=(10, 8.6))
+    ax.set_xlim(0, 12); ax.set_ylim(0, 10.6); ax.axis("off")
+    box = dict(boxstyle="square,pad=0.6", facecolor="white", edgecolor="0.15", linewidth=1.0)
+    steps = [
+        (9.6, "0. Set initial values:   $\\hat{x}_0,\\ P_0$"),
+        (7.6, "I. Predict state and error covariance:\n$\\hat{x}_k^- = A\\,\\hat{x}_{k-1} + B\\,u_{k-1}$\n$P_k^- = A\\,P_{k-1}A^T + Q$"),
+        (5.3, "II. Compute the Kalman gain:\n$K_k = P_k^- H^T\\,(H P_k^- H^T + R)^{-1}$"),
+        (3.1, "III. Compute the estimate:\n$\\hat{x}_k = \\hat{x}_k^- + K_k\\,(z_k - H\\,\\hat{x}_k^-)$"),
+        (0.9, "IV. Compute the error covariance:\n$P_k = P_k^- - K_k H P_k^-$"),
+    ]
+    T = [ax.text(6, y, txt, ha="center", va="center", fontsize=19, bbox=box, linespacing=1.5) for y, txt in steps]
+    fig.tight_layout()
+    fig.canvas.draw()
+    inv = ax.transData.inverted()
+    E = []
+    for t in T:
+        bb = t.get_bbox_patch().get_window_extent()
+        (x0, y0), (x1, y1) = inv.transform([[bb.x0, bb.y0], [bb.x1, bb.y1]])
+        E.append((x0, y0, x1, y1))
+    arr = lambda p, q, c="k", st="-|>": ax.annotate("", xy=q, xytext=p, arrowprops=dict(arrowstyle=st, color=c, lw=1.3, shrinkA=0, shrinkB=0))
+    for i in range(4):
+        arr((6, E[i][1]), (6, E[i + 1][3]))
+    xr = max(e[2] for e in E) + 2.1
+    ymid = lambda e: (e[1] + e[3]) / 2
+    arr((E[4][2], ymid(E[4])), (xr, ymid(E[4])), st="-")
+    arr((xr, ymid(E[4])), (xr, ymid(E[1])), st="-")
+    arr((xr, ymid(E[1])), (E[1][2], ymid(E[1])))
+    ax.text(xr + 0.15, (ymid(E[1]) + ymid(E[4])) / 2, "next step\n$k \\leftarrow k+1$", fontsize=14, va="center")
+    arr((0.2, ymid(E[3])), (E[3][0], ymid(E[3])), c=MO)
+    ax.text(0.2, ymid(E[3]) + 0.3, "measurement $z_k$", fontsize=14, color=MO)
+    arr((E[3][2], ymid(E[3]) - 0.25), (xr - 0.25, ymid(E[3]) - 0.25), c=MB)
+    ax.text(E[3][2] + 0.05, ymid(E[3]) - 0.75, "estimate $\\hat{x}_k$ \u2192 guidance", fontsize=14, color=MB)
+    fig.savefig(OUT + "s16_kf_loop.png", bbox_inches="tight")
+    plt.close(fig)
+
+
+# ================================================================ slide 17: all errors, three guidance options (LS1)
+def fig_e5():
+    d = [np.load("results/mc_E5_smcio.npz"), np.load("results/mc_E5_smcio_kf.npz"), np.load("results/mc_E5_zemzev.npz")]
+    labs = ["SMC-IO\n(paper)", "SMC-IO\n+ Kalman", "ZEM/ZEV-G"]
+    fig, ax = plt.subplots(1, 3, figsize=(13, 4.3))
+    for k, (key, yl, tt) in enumerate((("err", "final distance to site (m)", "Precision"),
+                                       ("dm", "fuel used (kg)", "Fuel"),
+                                       ("vf", "touchdown speed (m/s)", "Softness"))):
+        mboxplot(ax[k], [x[key] for x in d], labs)
+        ax[k].set_ylabel(yl); ax[k].set_title(tt)
+    ax[0].axhline(3.0, color="k", linestyle=":", linewidth=1)
+    ax[2].axhline(0.1, color="k", linestyle=":", linewidth=1)
+    fig.suptitle("LS1 only, all errors together (E5), 100 runs each", fontsize=14)
+    fig.tight_layout()
+    fig.savefig(OUT + "s17_e5_compare.png")
+    plt.close(fig)
+
+
+if __name__ == "__main__":
+    fig_gravity()
+    fig_mc_sensitivity()
+    fig_box()
+    fig_kf()
+    fig_kf_loop()
+    fig_e5()
+    print("figures in", OUT)
